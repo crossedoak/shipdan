@@ -58,6 +58,33 @@ for result in results['matches']:
 	title = rawTitle.split(" - ")[0]
 	outputList.append(rawTitle + ' - ' + result['ip_str'] + '\nSeen: ' + result['timestamp'] + '\n')
 	
+#Shodan search 2
+try:
+	results = api.search('title:"SAILOR" port:8080')
+except shodan.APIError as e:
+		print ('Error: {}'.format(e))
+for result in results['matches']:
+	IPlist = result['ip_str']
+	try:
+		page = BeautifulSoup(requests.get('http://' + IPlist + ':8080').text, "html.parser")
+		rawTitle = page.find(id="status_hostname").text
+		title = rawTitle.split(" - ")[0]
+		outputList.append(rawTitle + ' - ' + result['ip_str'] + '\nSeen: ' + result['timestamp'] + '\n')
+	except:
+		print ('Error connecting to host: {}'.format(result['ip_str']))
+
+
+#Shodan search 3
+try:
+	results = api.search('title:"Thrane &amp;"')
+except shodan.APIError as e:
+		print ('Error: {}'.format(e))
+
+
+#refine the list
+refinedoutputList = list(set(outputList))
+
+
 #auth to twitter
 auth = tweepy.OAuthHandler(consumerKey,  consumerSecret)
 auth.set_access_token(accessToken, secretToken)
@@ -70,8 +97,8 @@ except:
 
 #Verify contents to tweet
 total = '{}'.format(results['total'])
-tweetHeader = total + " ship SATCOM terminals found on Shodan. \n"
-print( tweetHeader + '\n' + '\n'.join([str(i) for i in outputList]))
+tweetHeader = total + " ship SATCOM/Fleetbroadband terminals found on Shodan. \n" 
+print( tweetHeader + '\n' + '\n'.join([str(i) for i in refinedoutputList]))
 
 userChoice = input('\nIs this what you want to tweet? (Y/N): ')
 if userChoice.lower() == 'y' or userChoice.lower() == 'yes': 
@@ -83,6 +110,8 @@ elif userChoice.lower() == 'n' or userChoice.lower() == 'no':
 else: 
 	print("Invalid choice, exiting")
 	exit(0)
+
+
 
 
 
