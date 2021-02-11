@@ -64,11 +64,26 @@ auth.set_access_token(accessToken, secretToken)
 api = tweepy.API(auth)
 try:
 	api.verify_credentials()
-	print("Authenticated")
-	total = '{}'.format(results['total'])
-	tweetHeader = total + " ship SATCOM terminals found on Shodan. \n"
-	print( tweetHeader + '\n' + '\n'.join([str(i) for i in outputList]))
+	print("Authenticated \n")
+except:
+	print("Authentication Failed \n")
+
+#Verify contents to tweet
+total = '{}'.format(results['total'])
+tweetHeader = total + " ship SATCOM terminals found on Shodan. \n"
+print( tweetHeader + '\n' + '\n'.join([str(i) for i in outputList]))
+
+userChoice = input('\nIs this what you want to tweet? (Y/N): ')
+if userChoice.lower() == 'y' or userChoice.lower() == 'yes': 
 	api.update_status(tweetHeader + '\n' + '\n'.join([str(i) for i in outputList]))
 	print("Tweeted successfully")
-except:
-	print("Authentication Failed")
+elif userChoice.lower() == 'n' or userChoice.lower() == 'no':
+	print("No tweet created. Check inputs.")
+	exit(0)
+else: 
+	print("Invalid choice, exiting")
+	exit(0)
+
+
+
+	
