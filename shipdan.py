@@ -7,7 +7,8 @@ import requests
 import tweepy
 import json
 import getopt, sys
-
+import sqlite3
+import re
 
 #get command line arguments
 argumentList = sys.argv[1:]
@@ -72,7 +73,7 @@ for result in results['matches']:
 		page = BeautifulSoup(requests.get('http://' + IPlist + ':8080').text, "html.parser")
 		rawTitle = page.find(id="status_hostname").text
 		title = rawTitle.split(" - ")[0]
-		outputList.append(rawTitle + ' - ' + result['ip_str'] + '\nSeen: ' + result['timestamp'] + '\n')
+		outputList.append(rawTitle + ' - ' + result['ip_str'] + '\nSeen: ' + result['timestamp'] + '.\n')
 	except:
 		print ('Error connecting to host: {}'.format(result['ip_str']))
 
@@ -111,9 +112,30 @@ total = int(totalFleetBroadband) + int(totalAptusWeb) + int(totalSearch1) + int(
 tweetHeader = str(total) + " vessel terminals found on Shodan. \n" + totalFleetBroadband + " Thrane Fleet Broadband\n" + totalAptusWeb + " Intellian AptusWeb portals\n" 
 print( tweetHeader + '\n' + '\n'.join([str(i) for i in refinedoutputList]))
 
+
+
+
+
+
 userChoice = input('\nIs this what you want to tweet? (Y/N): ')
 if userChoice.lower() == 'y' or userChoice.lower() == 'yes': 
-	api.update_status(tweetHeader + '\n' + '\n'.join([str(i) for i in outputList]))
+	#api.update_status(tweetHeader + '\n' + '\n'.join([str(i) for i in refinedoutputList]))
+	#split if needed
+	completeTweet = tweetHeader + '\n' + '\n'.join([str(i) for i in refinedoutputList])
+	preTweet = ""
+	tweet_list = []
+	text_list = re.split(r'(\.)', completeTweet)
+
+	for word in text_list:
+		if len(preTweet + word) > 137:
+			tweet_list.append(preTweet)
+			preTweet = word
+		else:
+			preTweet = preTweet + word
+	tweet_list.append(preTweet)
+	for post in tweet_list:
+		api.update_status(post)
+	
 	print("Tweeted successfully")
 elif userChoice.lower() == 'n' or userChoice.lower() == 'no':
 	print("No tweet created. Check inputs.")
@@ -122,8 +144,50 @@ else:
 	print("Invalid choice, exiting")
 	exit(0)
 
+'''#database things start here
+def create_connection(db_file):
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+        print(sqlite3.version)
+        return conn
+    except Error as e:
+        print(e)
+    return conn
 
+def create_table(conn, create_table_sql):
+	try:
+		c = conn.cursor()
+		c.execute(create_table_sql)
+	except Error as e:
+		print(e)
 
+def main():
+	database = r"~/Documents/shidan/shipdan.db"
 
+	sql_create_ships_table = """ CREATE TABLE IF NOT EXISTS ships (
+									id integer PRIMARY KEY,
+									name text NOT NULL,
+									ip text NOT NULL,
+									timestamp text
+									); """
 
-	
+	sql_create_FleetBroadband = """CREATE TABLE IF NOT EXISTS FleetBroadband (
+									id integer PRIMARY KEY,
+									ip text NOT NULL,
+									timestamp text
+									); """
+
+	conn = create_connection(database)
+
+	if conn is not None:
+		create_table(conn, sql_create_ships_table)
+		create_table(conn, sql_create_FleetBroadband)
+	else:
+		print("error! cannot create the database connection")
+
+if __name__ == '__main__':
+	#create_connection(r"~/Documents/shidan/shipdan.db")
+	main()
+
+	'''
