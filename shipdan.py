@@ -45,6 +45,8 @@ api = shodan.Shodan(SHODAN_API_KEY)
 try:
  	#searching
 	results = api.search('thrane port:10000')
+	totalSearch1 = '{}'.format(results['total'])
+
 
 except shodan.APIError as e:
 		print ('Error: {}'.format(e))
@@ -61,6 +63,7 @@ for result in results['matches']:
 #Shodan search 2
 try:
 	results = api.search('title:"SAILOR" port:8080')
+	totalSearch2 = '{}'.format(results['total'])
 except shodan.APIError as e:
 		print ('Error: {}'.format(e))
 for result in results['matches']:
@@ -77,6 +80,14 @@ for result in results['matches']:
 #Shodan search 3
 try:
 	results = api.search('title:"Thrane &amp;"')
+	totalFleetBroadband = '{}'.format(results['total'])
+except shodan.APIError as e:
+		print ('Error: {}'.format(e))
+
+try:
+ 	#searching
+	results = api.search('title:"Intellian Aptus Web"')
+	totalAptusWeb = '{}'.format(results['total'])
 except shodan.APIError as e:
 		print ('Error: {}'.format(e))
 
@@ -96,8 +107,8 @@ except:
 	print("Authentication Failed \n")
 
 #Verify contents to tweet
-total = '{}'.format(results['total'])
-tweetHeader = total + " ship SATCOM/Fleetbroadband terminals found on Shodan. \n" 
+total = int(totalFleetBroadband) + int(totalAptusWeb) + int(totalSearch1) + int(totalSearch2)
+tweetHeader = str(total) + " vessel terminals found on Shodan. \n" + totalFleetBroadband + " Thrane Fleet Broadband\n" + totalAptusWeb + " Intellian AptusWeb portals\n" 
 print( tweetHeader + '\n' + '\n'.join([str(i) for i in refinedoutputList]))
 
 userChoice = input('\nIs this what you want to tweet? (Y/N): ')
