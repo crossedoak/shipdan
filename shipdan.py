@@ -66,12 +66,17 @@ unitList = []
 titleList = []
 shipIPList = []
 shipTimestampList = []
+shipIPLat = []
+shipIPLong = []
+
 try:
 	results = api.search('title:"SAILOR" port:8080')
 	totalSearch2 = '{}'.format(results['total'])
+
 except shodan.APIError as e:
 		print ('Error: {}'.format(e))
 for result in results['matches']:
+	print( '%s' % result['location']['latitude'])
 	IPlist = result['ip_str']
 	try:
 		page = BeautifulSoup(requests.get('http://' + IPlist + ':8080').text, "html.parser")
@@ -83,6 +88,8 @@ for result in results['matches']:
 		titleList.append(title)
 		shipIPList.append(IPlist)
 		shipTimestampList.append(result['timestamp'])
+		shipIPLat.append(str(result['location']['latitude']))
+		shipIPLong.append(str(result['location']['longitude']))
 	except:
 		print ('Error connecting to host: {}'.format(result['ip_str']))
 
@@ -91,11 +98,16 @@ for result in results['matches']:
 try:
 	fleetBroadbandListIP = []
 	fleetBroadbandListTimestamp = []
+	fleetBroadbandLat = []
+	fleetBroadbandLong = []
 	results = api.search('title:"Thrane &amp;"')
 	totalFleetBroadband = '{}'.format(results['total'])
 	for result in results['matches']:
+		#print(result)
 		fleetBroadbandListIP.append(result['ip_str'])
 		fleetBroadbandListTimestamp.append(result['timestamp'])
+		fleetBroadbandLat.append(str(result['location']['latitude']))
+		fleetBroadbandLong.append(str(result['location']['longitude']))
 	
 		
 		
@@ -104,6 +116,8 @@ except shodan.APIError as e:
 
 aptusWebListIP = []
 aptusWebListTimestamp = []
+aptusWebLat = []
+aptusWebLong = []
 try:
  	#searching
 	results = api.search('title:"Intellian Aptus Web"')
@@ -111,10 +125,12 @@ try:
 	for result in results['matches']:
 		aptusWebListIP.append(result['ip_str'])
 		aptusWebListTimestamp.append(result['timestamp'])
+		aptusWebLat.append(str(result['location']['latitude']))
+		aptusWebLong.append(str(result['location']['longitude']))
 
 except shodan.APIError as e:
 		print ('Error: {}'.format(e))
-print(aptusWebListIP)
+
 
 #refine the list
 refinedoutputList = list(set(outputList))
@@ -140,24 +156,24 @@ def create_table(conn, create_table_sql):
 		print(e)
 
 def create_fleetBroadband(conn, FleetBroadband):
-	sql = '''INSERT OR IGNORE INTO FleetBroadband(id,ip,timestamp)
-			 VALUES(?,?,?) '''
+	sql = '''INSERT OR IGNORE INTO FleetBroadband(id,ip,timestamp,lat,long)
+			 VALUES(?,?,?,?,?) '''
 	cur = conn.cursor()
 	cur.execute(sql, FleetBroadband)
 	conn.commit()
 	return cur.lastrowid
 
 def create_Ships(conn, ship):
-	sql = '''INSERT OR IGNORE INTO ships(id,ip,unit,name,timestamp)
-			 VALUES(?,?,?,?,?) '''
+	sql = '''INSERT OR IGNORE INTO ships(id,ip,unit,name,timestamp,lat,long)
+			 VALUES(?,?,?,?,?,?,?) '''
 	cur = conn.cursor()
 	cur.execute(sql, ship)
 	conn.commit()
 	return cur.lastrowid
 
 def create_AptusWeb(conn, AptusWeb):
-	sql = '''INSERT OR IGNORE INTO AptusWeb(id,ip,timestamp)
-			 VALUES(?,?,?) '''
+	sql = '''INSERT OR IGNORE INTO AptusWeb(id,ip,timestamp,lat,long)
+			 VALUES(?,?,?,?,?) '''
 	cur = conn.cursor()
 	cur.execute(sql, AptusWeb)
 	conn.commit()
@@ -172,18 +188,24 @@ def main():
 									ip text PRIMARY KEY,
 									unit text,
 									name text NOT NULL,
-									timestamp text
+									timestamp text,
+									lat text,
+									long text
 									); """
 
 	sql_create_FleetBroadband = """CREATE TABLE IF NOT EXISTS FleetBroadband (
 									id int,
 									ip text PRIMARY KEY,
-									timestamp text
+									timestamp text,
+									lat text,
+									long text
 									); """
 	sql_create_AptusWeb = """CREATE TABLE IF NOT EXISTS AptusWeb (
 									id int,
 									ip text PRIMARY KEY,
-									timestamp text
+									timestamp text,
+									lat text,
+									long text
 									); """
 
 	conn = create_connection(database)
@@ -197,17 +219,17 @@ def main():
 
 	with conn:
 		count = 0
-		for item, item2 in list(zip(fleetBroadbandListIP, fleetBroadbandListTimestamp)):
+		for item, item2, item3, item4 in list(zip(fleetBroadbandListIP, fleetBroadbandListTimestamp, fleetBroadbandLat, fleetBroadbandLong)):
 			count += 1
-			fleetBroadband = (count, item, item2)
+			fleetBroadband = (count, item, item2, item3, item4)
 			fleetBroadband_id = create_fleetBroadband(conn, fleetBroadband)
-		for item, item2, item3, item4 in list(zip(shipIPList, unitList, titleList, shipTimestampList)):
+		for item, item2, item3, item4, item5, item6 in list(zip(shipIPList, unitList, titleList, shipTimestampList, shipIPLat, shipIPLong)):
 			count += 1
-			ships = (count, item, item2, item3, item4)
+			ships = (count, item, item2, item3, item4, item5, item6)
 			ships_id = create_Ships(conn, ships)
-		for item, item2 in list(zip(aptusWebListIP, aptusWebListTimestamp)):
+		for item, item2, item3, item4 in list(zip(aptusWebListIP, aptusWebListTimestamp, aptusWebLat, aptusWebLong)):
 			count += 1
-			aptusWeb = (count, item, item2)
+			aptusWeb = (count, item, item2, item3, item4)
 			aptusWeb_id = create_AptusWeb(conn, aptusWeb)
 
 if __name__ == '__main__':
