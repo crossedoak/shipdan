@@ -10,7 +10,12 @@ import getopt, sys
 import sqlite3
 import re
 
+#import gmplot
 #get command line arguments
+from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+import numpy as np
+
 argumentList = sys.argv[1:]
 
 options = "fh:"
@@ -39,6 +44,7 @@ with open(keyFile) as k:
 	consumerSecret = data['consumerSecret']
 	accessToken = data['accessToken']
 	secretToken = data['secretToken']
+	googleMapsKey = data['googleMaps']
 
 #Shodan API interaction
 api = shodan.Shodan(SHODAN_API_KEY)
@@ -48,11 +54,11 @@ try:
 	results = api.search('thrane port:10000')
 	totalSearch1 = '{}'.format(results['total'])
 
-
 except shodan.APIError as e:
 		print ('Error: {}'.format(e))
 
 outputList = []
+
 #soupy things
 for result in results['matches']:
 	IPlist = result['ip_str']
@@ -76,7 +82,7 @@ try:
 except shodan.APIError as e:
 		print ('Error: {}'.format(e))
 for result in results['matches']:
-	print( '%s' % result['location']['latitude'])
+	#print( '%s' % result['location']['latitude'])
 	IPlist = result['ip_str']
 	try:
 		page = BeautifulSoup(requests.get('http://' + IPlist + ':8080').text, "html.parser")
@@ -132,8 +138,32 @@ except shodan.APIError as e:
 		print ('Error: {}'.format(e))
 
 
+#seatel search
+seaTelListIP = []
+seaTelListTimestamp = []
+seaTelLat = []
+seaTelLong = []
+try:
+ 	#searching
+	results = api.search('http.html_hash:1634503840')
+	totalseaTel = '{}'.format(results['total'])
+	for result in results['matches']:
+		seaTelListIP.append(result['ip_str'])
+		seaTelListTimestamp.append(result['timestamp'])
+		seaTelLat.append(str(result['location']['latitude']))
+		seaTelLong.append(str(result['location']['longitude']))
+		#print(seaTelListIP)
+except shodan.APIError as e:
+		print ('Error: {}'.format(e))
+
+#print(seaTelListIP)
+
 #refine the list
 refinedoutputList = list(set(outputList))
+
+#Make map lists
+latList = []
+longList = []
 
 #database things start here
 def create_connection(db_file):
@@ -179,6 +209,28 @@ def create_AptusWeb(conn, AptusWeb):
 	conn.commit()
 	return cur.lastrowid
 
+def create_seaTel(conn, seaTel):
+	sql = '''INSERT OR IGNORE INTO seaTel(id,ip,timestamp,lat,long)
+			 VALUES(?,?,?,?,?) '''
+	cur = conn.cursor()
+	cur.execute(sql, seaTel)
+	conn.commit()
+	return cur.lastrowid
+
+def get_latList(conn):
+	cur = conn.cursor()
+	cur.execute("Select ships.lat FROM (((ships LEFT JOIN FleetBroadband ON ships.lat = FleetBroadband.lat) LEFT JOIN AptusWeb ON ships.lat = AptusWeb.lat) LEFT JOIN seaTel on ships.lat = seaTel.lat) WHERE ships.lat IS NOT NULL")
+	rows = cur.fetchall()
+	for row in rows:
+		latList.append(str(row))
+
+def get_longList(conn):
+	cur = conn.cursor()
+	cur.execute("Select ships.long FROM (((ships LEFT JOIN FleetBroadband ON ships.long = FleetBroadband.long) LEFT JOIN AptusWeb ON ships.long = AptusWeb.long) LEFT JOIN seaTel on ships.long = seaTel.long) WHERE ships.long IS NOT NULL")
+	rows = cur.fetchall()
+	for row in rows:
+		longList.append(str(row))
+
 
 def main():
 	database = r"/root/Documents/shipdan/shipdan.db"
@@ -207,6 +259,13 @@ def main():
 									lat text,
 									long text
 									); """
+	sql_create_seaTel = """CREATE TABLE IF NOT EXISTS seaTel (
+									id int,
+									ip text PRIMARY KEY,
+									timestamp text,
+									lat text,
+									long text
+									); """
 
 	conn = create_connection(database)
 
@@ -214,6 +273,7 @@ def main():
 		create_table(conn, sql_create_ships_table)
 		create_table(conn, sql_create_FleetBroadband)
 		create_table(conn, sql_create_AptusWeb)
+		create_table(conn, sql_create_seaTel)
 	else:
 		print("error! cannot create the database connection")
 
@@ -231,13 +291,44 @@ def main():
 			count += 1
 			aptusWeb = (count, item, item2, item3, item4)
 			aptusWeb_id = create_AptusWeb(conn, aptusWeb)
+		for item, item2, item3, item4 in list(zip(seaTelListIP, seaTelListTimestamp, seaTelLat, seaTelLong)):
+			count += 1
+			seaTel = (count, item, item2, item3, item4)
+			seaTel_id = create_seaTel(conn, seaTel)
+	'''	
+		get_latList(conn)
+		get_longList(conn)
+	#print(str(latList))
+	#print(str(longList))
+		#gmap4 = gmplot.GoogleMapPlotter.from_geocode("Earth", apikey=googleMapsKey)
+		#fig = plt.figure(figsize=(8, 6), edgecolor='w')
+		#m = Basemap(projection='cyl', resolution=None,
+            #llcrnrlat=-90, urcrnrlat=90,
+            #llcrnrlon=-180, urcrnrlon=180, )
+
+
+		#m = Basemap(projection='ortho', resolution=None, lat_0=50, lon_0=-100)
+		#m.bluemarble(scale=0.5)
+		#m.drawcoastlines(linewidth=0.25)
+		#m.drawcountries(linewidth=0.25)
+		#gmap4.heatmap( latList, longList )
+		#gmap4.draw("/root/Documents/shipdan/shipdanMap.html") 
+		#plt.figure(figsize=(8,8))
+		
+		#for a, b in list(zip(latList, longList)):
+			#plt.scatter(a, b, c='k', alpha=0.5, label=str(a))
+
+		#plt.show()
+
+	'''
+
 
 if __name__ == '__main__':
 	main()
 
 
 
-'''
+
 #auth to twitter
 auth = tweepy.OAuthHandler(consumerKey,  consumerSecret)
 auth.set_access_token(accessToken, secretToken)
@@ -249,8 +340,8 @@ except:
 	print("Authentication Failed \n")
 
 #Verify contents to tweet
-total = int(totalFleetBroadband) + int(totalAptusWeb) + int(totalSearch1) + int(totalSearch2)
-tweetHeader = str(total) + " vessel terminals found on Shodan. \n" + totalFleetBroadband + " Thrane Fleet Broadband\n" + totalAptusWeb + " Intellian AptusWeb portals\n" 
+total = int(totalseaTel) + int(totalFleetBroadband) + int(totalAptusWeb) + int(totalSearch1) + int(totalSearch2)
+tweetHeader = str(total) + " vessel terminals found on Shodan. \n" + totalFleetBroadband + " Thrane Fleet Broadband\n" + totalAptusWeb + " Intellian AptusWeb portals\n"  + totalseaTel + " SeaTel terminals\n"
 print( tweetHeader + '\n' + '\n'.join([str(i) for i in refinedoutputList]))
 
 userChoice = input('\nIs this what you want to tweet? (Y/N): ')
@@ -263,7 +354,7 @@ if userChoice.lower() == 'y' or userChoice.lower() == 'yes':
 	text_list = re.split(r'(\.)', completeTweet)
 
 	for word in text_list:
-		if len(preTweet + word) > 137:
+		if len(preTweet + word) > 237:
 			tweet_list.append(preTweet)
 			preTweet = word
 		else:
@@ -280,7 +371,7 @@ elif userChoice.lower() == 'n' or userChoice.lower() == 'no':
 else: 
 	print("Invalid choice, exiting")
 	exit(0)
-'''
+
 
 
 
